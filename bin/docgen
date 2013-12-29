@@ -1,0 +1,36 @@
+#!/usr/bin/env ruby
+
+opts = {}
+ARGV.find_all do |a|
+  a =~ /^\-\-/
+end.each do |o|
+  o =~ /^\-\-(.*?)=(.*)/
+  opts[$1] = $2
+end
+
+if !opts["runner"]
+  `mkdir -p tmp/doc`
+  
+  runner = "../runner.rb"
+  
+  File.open(runner,"w") do |f|
+    f.puts DATA.read.gsub("LIBNAME",opts["lib"])
+  end
+end
+  
+if opts["runner"]
+  runner = opts["runner"]
+end
+
+Dir.chdir "./tmp/doc"
+system "mruby #{runner}"
+`cp -rf ../doc ../../`
+Dir.chdir "../../"
+`cp ./data/style.css doc/`
+`cp ./data/tool.js doc/`
+`echo "<html><script>window.location='#{opts["lib"]}.html';</script></html>" > doc/index.html`
+__END__
+dg = DocGen.new(LIBNAME)
+ns = dg.document
+g = DocGen::Generator::HTML.new(ns)
+g.generate
