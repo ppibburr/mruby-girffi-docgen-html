@@ -1,6 +1,6 @@
 class DocGen
   module Generator
-    class HTML
+    class HTML < Base
       HEADER = "<html>
   <head>
     <link rel=\"stylesheet\" type=\"text/css\" href=style.css>
@@ -15,7 +15,7 @@ class DocGen
     
       attr_reader :namespace, :version
       def initialize ns, version = nil
-        @namespace = ns
+        super(ns)
         @version = version
         
         @topnav = "<div class=top_nav><a href=#{namespace[:name]}.html>#{namespace[:name]}::</a><form>
@@ -146,7 +146,7 @@ class DocGen
       
       def generate_type_link(t)
         link = t.to_s.split("::")[0] == namespace[:name]
-        q = link ? "<a href=##{t.to_s.split("::").join("_")}.html>#{t}</a>" : t      
+        q = link ? "<a href=#{t.to_s.split("::").join("_")}.html>#{t}</a>" : t      
       end
       
       def extract_type t,mklink=false
@@ -335,7 +335,9 @@ class DocGen
         
         puts HEADER+"\n  <body id=#{i[:name]} class=#{i.is_a?(DocGen::Output::Class) ? "class" : "iface"}>#{@topnav}"
 
+        cls = nil
         if i.is_a?(DocGen::Output::Class)
+          cls=true
           puts "<h2>Class: #{namespace[:name]}::#{i[:name]}</h2>"
         elsif i.is_a?(DocGen::Output::IFace)
           puts "<h2>Module: #{namespace[:name]}::#{i[:name]}</h2>"
@@ -344,22 +346,60 @@ class DocGen
         sc = i[:superclass]
         
         if sc
-          puts "    <div class=inherits id=inherits>Inherits:"
+          puts "    <div class=summary_header id=inherits_summary_header><b>Inherits</b>:"
           link = sc.split("::")[0] == namespace[:name]
         
-          puts "    #{link ? "<a href=#{sc.split("::").join("_")}.html>#{sc}</a>" : "#{sc}"}</div>"
+          puts "    <div class=item>#{link ? "<a href=#{sc.split("::").join("_")}.html>#{sc}</a>" : "#{sc}"}</div><small id=inherits_summary_toggle>(Collapse)</small></div>"
+          puts "<div id=inherits_summary><ul>"
+          i[:full_inherit].reverse.each do |e|
+            link2 = e.to_s.split("::").join("_")+".html" if e.to_s.split("::")[0] == namespace[:name]
+            if link2
+              puts "<li class=item item_block item_link><a href=#{link2}>&nbsp;&nbsp;#{e}&nbsp;&nbsp;</a></li>"          
+            else
+              puts "<li class=item item_block item_non_link>#{e}</li>"            
+            end
+            puts "<br>"
+          end
+          puts "</ul></div></div>"          
         end
         
         if !i[:includes].empty?
-          puts "    <div id=implements_header class=toggle>Implements:</div>"
+          puts "    <div id=implements_summary_header class=summary_header><b>Implements</b></div>"
           puts "    <div class=implements id=implements>"  
           implements = i[:includes].map do |inc|
             link = inc.data.namespace == @namespace[:name]
-            "<div>#{(link ? "      &nbsp;&nbsp;<a href=#{namespace[:name]}_#{inc.data.name}.html>#{inc}</a>" : "#{inc}")}&nbsp;&nbsp</div>"
+            "<div class='implement item'>#{(link ? "      &nbsp;&nbsp;<a href=#{namespace[:name]}_#{inc.data.name}.html>#{inc}</a>" : "#{inc}")}&nbsp;&nbsp</div>"
           end.join("\n\n")
           puts implements
-          puts "    </div></div>"        
+          puts "    </div>"        
         end
+        
+        if cls
+          unless (a=descendants(i)).empty?          
+            puts "<div class=summary_header id=descendants_summary_header><b>Known Desendants</b></div>"
+            puts "<div class=descendants>"
+            a.each do |d|
+              link = true
+              
+              d = link ? "<a href=#{d.split("::").join("_")}.html>#{d}</a>" : d
+              puts "<div class='descendant item item_link'>&nbsp;&nbsp;#{d}&nbsp;&nbsp;</div>"
+            end
+            puts "</div>"
+          end   
+        else
+          unless (a=implemented(i)).empty?          
+            puts "<div class=summary_header id=implemented_summary_header><b>Known Implementations</b></div>"
+            puts "<div class=implemented>"
+            a.each do |d|
+              link = true
+              
+              d = link ? "<a href=#{d.split("::").join("_")}.html>#{d}</a>" : d
+              puts "<div class='item item_link'>&nbsp;&nbsp;#{d}&nbsp;&nbsp;</div>"
+            end
+            puts "</div>"
+          end          
+        end
+
         
         generate_method_summary(i,:class)
         generate_method_summary(i)
